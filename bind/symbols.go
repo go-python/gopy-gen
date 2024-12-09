@@ -1083,24 +1083,32 @@ func (sym *symtab) addSignatureType(pkg *types.Package, obj types.Object, t type
 
 	py2g := fmt.Sprintf("%s { ", nsig)
 
+	py2g += "_gstate := C.PyGILState_Ensure()\n"
+
 	// TODO: use strings.Builder
 	if rets.Len() == 0 {
-		py2g += "if C.PyCallable_Check(_fun_arg) == 0 { return }\n"
+		py2g += "if C.PyCallable_Check(_fun_arg) == 0 {\n"
+		py2g += "C.PyGILState_Release(_gstate)\n" // Release GIL
+		py2g += "return\n"
+		py2g += "}\n"
 	} else {
 		zstr, err := sym.ZeroToGo(ret.Type(), rsym)
 		if err != nil {
 			return err
 		}
-		py2g += fmt.Sprintf("if C.PyCallable_Check(_fun_arg) == 0 { return %s }\n", zstr)
+		py2g += "if C.PyCallable_Check(_fun_arg) == 0 {\n"
+		py2g += "C.PyGILState_Release(_gstate)\n" // Release GIL
+		py2g += fmt.Sprintf("return %s\n", zstr)
+		py2g += "}\n"
 	}
-	py2g += "_gstate := C.PyGILState_Ensure()\n"
+
 	if nargs > 0 {
 		bstr, err := sym.buildTuple(args, "_fcargs", "_fun_arg")
 		if err != nil {
 			return err
 		}
 		py2g += bstr + retstr
-		py2g += fmt.Sprintf("C.PyObject_CallObject(_fun_arg, _fcargs)\n")
+		py2g += "C.PyObject_CallObject(_fun_arg, _fcargs)\n"
 		py2g += "C.gopy_decref(_fcargs)\n"
 	} else {
 		// TODO: methods not supported for no-args case -- requires self arg..
