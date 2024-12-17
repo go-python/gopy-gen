@@ -70,6 +70,16 @@ in which case a new Go object is constructed first
 		if _, err := isPyCompatField(f); err != nil {
 			continue
 		}
+
+		gname := f.Name()
+		if g.cfg.RenameCase {
+			gname = toSnakeCase(gname)
+		}
+
+		if newName, err := extractPythonNameFieldTag(gname, s.Struct().Tag(i)); err == nil {
+			gname = newName
+		}
+
 		// NOTE: this will accept int args for any handles / object fields so
 		// some kind of additional type-checking logic to prevent that in a way
 		// that also allows valid handles to be used as required. This is
@@ -79,11 +89,11 @@ in which case a new Go object is constructed first
 		// etc can be assigned to directly.
 		g.pywrap.Printf("if  %[1]d < len(args):\n", i)
 		g.pywrap.Indent()
-		g.pywrap.Printf("self.%s = args[%d]\n", f.Name(), i)
+		g.pywrap.Printf("self.%s = args[%d]\n", gname, i)
 		g.pywrap.Outdent()
-		g.pywrap.Printf("if %[1]q in kwargs:\n", f.Name())
+		g.pywrap.Printf("if %[1]q in kwargs:\n", gname)
 		g.pywrap.Indent()
-		g.pywrap.Printf("self.%[1]s = kwargs[%[1]q]\n", f.Name())
+		g.pywrap.Printf("self.%[1]s = kwargs[%[1]q]\n", gname)
 		g.pywrap.Outdent()
 	}
 	g.pywrap.Outdent()
